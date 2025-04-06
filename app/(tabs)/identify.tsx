@@ -103,8 +103,10 @@ export default function IdentifyScreen() {
           exif: true,
         });
         
-        setCapturedImage(photo.uri);
-        animatePreviewIn();
+        if (photo?.uri) {
+          setCapturedImage(photo.uri);
+          animatePreviewIn();
+        }
       } catch (error) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         Alert.alert('Error', 'Failed to capture image');
@@ -199,6 +201,7 @@ export default function IdentifyScreen() {
         facing={type}
         flash={flashMode}
         zoom={zoom}
+        enableTorch={flashMode === 'on'}
       >
         {/* Focus animation overlay */}
         <Animated.View
