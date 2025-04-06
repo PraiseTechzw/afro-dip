@@ -18,29 +18,26 @@ import { useRouter } from 'expo-router';
 import { theme } from '../../constants/theme';
 import * as Haptics from 'expo-haptics';
 
-type CameraType = 'back' | 'front';
-type FlashMode = 'off' | 'on';
-
 const CameraConstants = {
   Type: {
-    back: 'back',
-    front: 'front'
+    back: 'back' as const,
+    front: 'front' as const,
   },
   FlashMode: {
-    off: 'off',
-    on: 'on'
-  }
+    off: 'off' as const,
+    on: 'on' as const,
+  },
 };
 
-export default function IdentifyScreen() {
+const IdentifyScreen = () => {
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [type, setType] = useState<CameraType>('back');
+  const [type, setType] = useState<'back' | 'front'>(CameraConstants.Type.back);
   const [isLoading, setIsLoading] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const cameraRef = useRef<typeof Camera>(null);
-  const [flashMode, setFlashMode] = useState<FlashMode>('off');
+  const [flashMode, setFlashMode] = useState<'off' | 'on'>(CameraConstants.FlashMode.off);
   const [zoom, setZoom] = useState(0);
   const [focusAnim] = useState(new Animated.Value(0));
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -638,3 +635,5 @@ const styles = StyleSheet.create({
     color: theme.colors.white,
   },
 });
+
+export default IdentifyScreen;
