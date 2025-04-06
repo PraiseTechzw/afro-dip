@@ -35,7 +35,7 @@ export default function LibraryScreen() {
       <Image
         source={{ uri: item.imageUrl }}
         style={styles.speciesImage}
-        defaultSource={require('../assets/placeholder.png')}
+        defaultSource={require('../assets/images/image.png')}
       />
       <View style={styles.speciesInfo}>
         <Text style={styles.scientificName}>{item.scientificName}</Text>

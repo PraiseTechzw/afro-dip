@@ -21,7 +21,7 @@ export default function SpeciesDetailScreen() {
       <Image
         source={{ uri: species.imageUrl }}
         style={styles.image}
-        defaultSource={require('../../assets/placeholder.png')}
+        defaultSource={require('../../assets/images/image.png')}
       />
       
       <View style={styles.content}>

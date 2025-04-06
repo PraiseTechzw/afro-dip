@@ -1,14 +1,14 @@
 export const theme = {
   colors: {
-    primary: '#2E7D32', // Main green color
-    primaryLight: '#4CAF50', // Lighter green
-    primaryDark: '#1B5E20', // Darker green
+    primary: '#4CAF50',
+    primaryLight: '#E8F5E9',
+    secondary: '#2E7D32',
     background: '#FFFFFF',
     text: '#333333',
     textLight: '#666666',
     white: '#FFFFFF',
+    gray: '#CCCCCC',
     black: '#000000',
-    gray: '#E0E0E0',
   },
   spacing: {
     xs: 4,
@@ -19,12 +19,12 @@ export const theme = {
   },
   typography: {
     h1: {
-      fontSize: 32,
-      fontWeight: 'bold',
+      fontSize: 24,
+      fontWeight: '700' as const,
     },
     h2: {
-      fontSize: 24,
-      fontWeight: 'bold',
+      fontSize: 20,
+      fontWeight: '700' as const,
     },
     body: {
       fontSize: 16,
@@ -32,10 +32,15 @@ export const theme = {
     caption: {
       fontSize: 14,
     },
+    button: {
+      fontSize: 16,
+      fontWeight: '700' as const,
+    },
   },
   borderRadius: {
     sm: 4,
     md: 8,
-    lg: 16,
+    lg: 12,
+    xl: 16,
   },
 }; 
