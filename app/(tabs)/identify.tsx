@@ -11,7 +11,7 @@ import {
   StatusBar,
   useWindowDimensions,
 } from 'react-native';
-import { Camera } from 'expo-camera';
+import { Camera } from 'expo-camera/build/Camera';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -36,7 +36,7 @@ export default function IdentifyScreen() {
   const [type, setType] = useState(CameraConstants.Type.back);
   const [isLoading, setIsLoading] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
-  const cameraRef = useRef<Camera>(null);
+  const cameraRef = useRef<any>(null);
   const [flashMode, setFlashMode] = useState(CameraConstants.FlashMode.off);
   const [zoom, setZoom] = useState(0);
   const [focusAnim] = useState(new Animated.Value(0));

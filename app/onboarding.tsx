@@ -6,7 +6,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 
-type IconName = 'fly' | 'camera' | 'book-open-page-variant' | 'school';
+// Using valid MaterialCommunityIcons names
+type IconName = 'butterfly' | 'camera' | 'book-open-page-variant' | 'school';
 
 interface Slide {
   id: string;
@@ -22,7 +23,7 @@ const slides: Slide[] = [
     id: '1',
     title: 'Welcome to Afro-Dip',
     description: 'Your comprehensive guide to identifying flies in Zimbabwe',
-    icon: 'fly',
+    icon: 'butterfly', // Using butterfly icon as it's the closest to a fly in the icon set
     iconColor: '#00BFA5',
     backgroundColor: '#E0F7FA',
   },
