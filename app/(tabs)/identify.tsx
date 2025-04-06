@@ -11,12 +11,15 @@ import {
   StatusBar,
   useWindowDimensions,
 } from 'react-native';
-import { Camera, CameraType, FlashMode } from 'expo-camera';
+import { Camera } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { theme } from '../../constants/theme';
 import * as Haptics from 'expo-haptics';
+
+type CameraType = 'back' | 'front';
+type FlashMode = 'off' | 'on';
 
 const CameraConstants = {
   Type: {
@@ -33,11 +36,11 @@ export default function IdentifyScreen() {
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [type, setType] = useState<CameraType>(CameraType.back);
+  const [type, setType] = useState<CameraType>('back');
   const [isLoading, setIsLoading] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
-  const cameraRef = useRef<Camera>(null);
-  const [flashMode, setFlashMode] = useState<FlashMode>(FlashMode.off);
+  const cameraRef = useRef<typeof Camera>(null);
+  const [flashMode, setFlashMode] = useState<FlashMode>('off');
   const [zoom, setZoom] = useState(0);
   const [focusAnim] = useState(new Animated.Value(0));
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -183,18 +186,18 @@ export default function IdentifyScreen() {
   const toggleFlash = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setFlashMode(
-      flashMode === FlashMode.off 
-        ? FlashMode.on 
-        : FlashMode.off
+      flashMode === 'off' 
+        ? 'on' 
+        : 'off'
     );
   };
 
   const toggleCameraType = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setType(
-      type === CameraType.back 
-        ? CameraType.front 
-        : CameraType.back
+      type === 'back' 
+        ? 'front' 
+        : 'back'
     );
   };
 
@@ -294,12 +297,12 @@ export default function IdentifyScreen() {
               <TouchableOpacity
                 style={[
                   styles.controlButton,
-                  flashMode === FlashMode.off && styles.activeControlButton
+                  flashMode === 'off' && styles.activeControlButton
                 ]}
                 onPress={toggleFlash}
               >
                 <MaterialCommunityIcons
-                  name={flashMode === FlashMode.off ? 'flash-off' : 'flash'}
+                  name={flashMode === 'off' ? 'flash-off' : 'flash'}
                   size={24}
                   color={theme.colors.white}
                 />
