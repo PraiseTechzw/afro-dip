@@ -8,42 +8,82 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  StatusBar,
+  useWindowDimensions,
 } from 'react-native';
-import { Camera, CameraType } from 'expo-camera';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { theme } from '../../constants/theme';
+import * as Haptics from 'expo-haptics';
 
 export default function IdentifyScreen() {
   const router = useRouter();
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [type, setType] = useState(CameraType.back);
+  const { width: screenWidth } = useWindowDimensions();
+  const [permission, requestPermission] = useCameraPermissions();
+  const [type, setType] = useState<'back' | 'front'>('back');
   const [isLoading, setIsLoading] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
-  const cameraRef = useRef<Camera>(null);
-  const [flashMode, setFlashMode] = useState(Camera.Constants.FlashMode.off);
+  const cameraRef = useRef<CameraView>(null);
+  const [flashMode, setFlashMode] = useState<'off' | 'on'>('off');
   const [zoom, setZoom] = useState(0);
   const [focusAnim] = useState(new Animated.Value(0));
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  
+  // Animation values
+  const shutterAnimation = useRef(new Animated.Value(1)).current;
+  const previewSlideIn = useRef(new Animated.Value(screenWidth)).current;
 
   useEffect(() => {
-    (async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(status === 'granted');
-    })();
-  }, []);
+    if (!permission?.granted) {
+      requestPermission();
+    }
+  }, [permission]);
+
+  const animateShutter = () => {
+    Animated.sequence([
+      Animated.timing(shutterAnimation, {
+        toValue: 0,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shutterAnimation, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const animatePreviewIn = () => {
+    Animated.spring(previewSlideIn, {
+      toValue: 0,
+      useNativeDriver: true,
+      tension: 50,
+      friction: 7,
+    }).start();
+  };
+
+  const animatePreviewOut = () => {
+    Animated.spring(previewSlideIn, {
+      toValue: screenWidth,
+      useNativeDriver: true,
+      tension: 50,
+      friction: 7,
+    }).start(() => setCapturedImage(null));
+  };
 
   const handleCapture = async () => {
     if (cameraRef.current) {
       try {
         setIsLoading(true);
-        const photo = await cameraRef.current.takePictureAsync({
-          quality: 1,
-          base64: true,
-          exif: true,
-        });
-        setCapturedImage(photo.uri);
+        // Provide haptic feedback
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         
-        // Animate focus effect
+        // Animate shutter effect
+        animateShutter();
+        
+        // Animate focus ring
         Animated.sequence([
           Animated.timing(focusAnim, {
             toValue: 1,
@@ -56,8 +96,19 @@ export default function IdentifyScreen() {
             useNativeDriver: true,
           }),
         ]).start();
+        
+        const photo = await cameraRef.current.takePictureAsync({
+          quality: 1,
+          base64: true,
+          exif: true,
+        });
+        
+        setCapturedImage(photo.uri);
+        animatePreviewIn();
       } catch (error) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         Alert.alert('Error', 'Failed to capture image');
+        console.error('Camera error:', error);
       } finally {
         setIsLoading(false);
       }
@@ -65,122 +116,146 @@ export default function IdentifyScreen() {
   };
 
   const handleRetake = () => {
-    setCapturedImage(null);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    animatePreviewOut();
   };
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
     if (capturedImage) {
-      setIsLoading(true);
-      // Simulate analysis
-      setTimeout(() => {
-        setIsLoading(false);
-        router.push('/species/1'); // Navigate to species detail
-      }, 2000);
+      try {
+        setIsAnalyzing(true);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        
+        // Simulate API call to identify species
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Navigate to results
+        router.push('/species/1');
+      } catch (error) {
+        Alert.alert('Error', 'Failed to analyze image');
+      } finally {
+        setIsAnalyzing(false);
+      }
     }
   };
 
   const toggleFlash = () => {
-    setFlashMode(
-      flashMode === Camera.Constants.FlashMode.off
-        ? Camera.Constants.FlashMode.on
-        : Camera.Constants.FlashMode.off
-    );
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setFlashMode(flashMode === 'off' ? 'on' : 'off');
   };
 
   const toggleCameraType = () => {
-    setType(
-      type === CameraType.back ? CameraType.front : CameraType.back
-    );
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setType(type === 'back' ? 'front' : 'back');
   };
 
   const handleZoom = (value: number) => {
-    setZoom(Math.min(Math.max(0, zoom + value), 1));
+    const newZoom = Math.min(Math.max(0, zoom + value), 1);
+    if (newZoom !== zoom) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setZoom(newZoom);
+    }
   };
 
-  if (hasPermission === null) {
-    return <View style={styles.container} />;
+  if (permission === null) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={styles.loadingText}>Requesting camera permission...</Text>
+      </View>
+    );
   }
 
-  if (hasPermission === false) {
+  if (permission === false) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.permissionText}>No access to camera</Text>
+      <View style={styles.permissionContainer}>
+        <MaterialCommunityIcons 
+          name="camera-off" 
+          size={64} 
+          color={theme.colors.error} 
+        />
+        <Text style={styles.permissionText}>Camera access denied</Text>
         <Text style={styles.permissionSubtext}>
-          Please enable camera access in your device settings
+          Please enable camera access in your device settings to identify species
         </Text>
+        <TouchableOpacity 
+          style={styles.permissionButton}
+          onPress={() => router.back()}
+        >
+          <Text style={styles.permissionButtonText}>Go Back</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {capturedImage ? (
-        <View style={styles.previewContainer}>
-          <Image source={{ uri: capturedImage }} style={styles.preview} />
-          <View style={styles.previewActions}>
+      <StatusBar barStyle="light-content" />
+      
+      {/* Camera View */}
+      <CameraView
+        ref={cameraRef}
+        style={styles.camera}
+        facing={type}
+        flash={flashMode}
+        zoom={zoom}
+      >
+        {/* Focus animation overlay */}
+        <Animated.View
+          style={[
+            styles.focusOverlay,
+            {
+              opacity: focusAnim,
+              transform: [
+                {
+                  scale: focusAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [1, 1.2],
+                  }),
+                },
+              ],
+            },
+          ]}
+        />
+        
+        {/* Shutter animation */}
+        <Animated.View 
+          style={[
+            styles.shutterEffect,
+            { opacity: Animated.subtract(1, shutterAnimation) }
+          ]} 
+        />
+        
+        {/* Camera UI Controls */}
+        <View style={styles.controls}>
+          {/* Top Controls */}
+          <View style={styles.topControls}>
             <TouchableOpacity
-              style={styles.actionButton}
-              onPress={handleRetake}
+              style={styles.backButton}
+              onPress={() => router.back()}
             >
               <MaterialCommunityIcons
-                name="camera-retake"
+                name="arrow-left"
                 size={24}
                 color={theme.colors.white}
               />
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={handleAnalyze}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <ActivityIndicator color={theme.colors.white} />
-              ) : (
-                <MaterialCommunityIcons
-                  name="magnify"
-                  size={24}
-                  color={theme.colors.white}
-                />
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-      ) : (
-        <Camera
-          ref={cameraRef}
-          style={styles.camera}
-          type={type}
-          flashMode={flashMode}
-          zoom={zoom}
-        >
-          <Animated.View
-            style={[
-              styles.focusOverlay,
-              {
-                opacity: focusAnim,
-                transform: [
-                  {
-                    scale: focusAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [1, 1.2],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          />
-          <View style={styles.controls}>
-            <View style={styles.topControls}>
+            
+            <View style={styles.rightControls}>
               <TouchableOpacity
-                style={styles.controlButton}
+                style={[
+                  styles.controlButton,
+                  flashMode === 'on' && styles.activeControlButton
+                ]}
                 onPress={toggleFlash}
               >
                 <MaterialCommunityIcons
-                  name={flashMode === Camera.Constants.FlashMode.off ? 'flash-off' : 'flash'}
+                  name={flashMode === 'off' ? 'flash-off' : 'flash'}
                   size={24}
                   color={theme.colors.white}
                 />
               </TouchableOpacity>
+              
               <TouchableOpacity
                 style={styles.controlButton}
                 onPress={toggleCameraType}
@@ -192,48 +267,112 @@ export default function IdentifyScreen() {
                 />
               </TouchableOpacity>
             </View>
+          </View>
 
-            <View style={styles.bottomControls}>
+          {/* Zoom indicator */}
+          {zoom > 0 && (
+            <View style={styles.zoomIndicator}>
+              <Text style={styles.zoomText}>{`${(zoom * 100).toFixed(0)}%`}</Text>
+            </View>
+          )}
+
+          {/* Bottom Controls */}
+          <View style={styles.bottomControls}>
+            <TouchableOpacity
+              style={styles.zoomButton}
+              onPress={() => handleZoom(-0.1)}
+            >
+              <MaterialCommunityIcons
+                name="minus"
+                size={24}
+                color={theme.colors.white}
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.captureButton,
+                isLoading && styles.disabledCaptureButton
+              ]}
+              onPress={handleCapture}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator color={theme.colors.white} size="large" />
+              ) : (
+                <View style={styles.captureButtonInner} />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.zoomButton}
+              onPress={() => handleZoom(0.1)}
+            >
+              <MaterialCommunityIcons
+                name="plus"
+                size={24}
+                color={theme.colors.white}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </CameraView>
+      
+      {/* Image Preview */}
+      {capturedImage && (
+        <Animated.View 
+          style={[
+            styles.previewContainer,
+            { transform: [{ translateX: previewSlideIn }] }
+          ]}
+        >
+          <Image source={{ uri: capturedImage }} style={styles.preview} />
+          
+          {/* Preview Overlay */}
+          <View style={styles.previewOverlay}>
+            <Text style={styles.previewTitle}>Ready to identify?</Text>
+            
+            {/* Preview Actions */}
+            <View style={styles.previewActions}>
               <TouchableOpacity
-                style={styles.zoomButton}
-                onPress={() => handleZoom(-0.1)}
+                style={styles.actionButton}
+                onPress={handleRetake}
               >
                 <MaterialCommunityIcons
-                  name="minus"
+                  name="camera-retake"
                   size={24}
                   color={theme.colors.white}
                 />
+                <Text style={styles.actionText}>Retake</Text>
               </TouchableOpacity>
-
+              
               <TouchableOpacity
-                style={styles.captureButton}
-                onPress={handleCapture}
-                disabled={isLoading}
+                style={[
+                  styles.analyzeButton,
+                  isAnalyzing && styles.disabledAnalyzeButton
+                ]}
+                onPress={handleAnalyze}
+                disabled={isAnalyzing}
               >
-                {isLoading ? (
-                  <ActivityIndicator color={theme.colors.white} />
+                {isAnalyzing ? (
+                  <>
+                    <ActivityIndicator color={theme.colors.white} />
+                    <Text style={styles.actionText}>Analyzing...</Text>
+                  </>
                 ) : (
-                  <MaterialCommunityIcons
-                    name="camera"
-                    size={32}
-                    color={theme.colors.white}
-                  />
+                  <>
+                    <MaterialCommunityIcons
+                      name="magnify"
+                      size={24}
+                      color={theme.colors.white}
+                    />
+                    <Text style={styles.actionText}>Identify</Text>
+                  </>
                 )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.zoomButton}
-                onPress={() => handleZoom(0.1)}
-              >
-                <MaterialCommunityIcons
-                  name="plus"
-                  size={24}
-                  color={theme.colors.white}
-                />
               </TouchableOpacity>
             </View>
           </View>
-        </Camera>
+        </Animated.View>
       )}
     </View>
   );
@@ -244,16 +383,47 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: theme.colors.background,
+    padding: 20,
+  },
+  loadingText: {
+    ...theme.typography.body,
+    color: theme.colors.text,
+    marginTop: 16,
+  },
+  permissionContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: theme.colors.background,
+    padding: 20,
+  },
   permissionText: {
     ...theme.typography.h2,
     color: theme.colors.text,
     textAlign: 'center',
+    marginTop: 16,
     marginBottom: 8,
   },
   permissionSubtext: {
     ...theme.typography.body,
     color: theme.colors.textLight,
     textAlign: 'center',
+    marginBottom: 24,
+  },
+  permissionButton: {
+    backgroundColor: theme.colors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  permissionButtonText: {
+    ...theme.typography.button,
+    color: theme.colors.white,
   },
   camera: {
     flex: 1,
@@ -264,7 +434,17 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderWidth: 2,
+    borderColor: theme.colors.white,
+    borderRadius: 16,
+  },
+  shutterEffect: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: theme.colors.white,
   },
   controls: {
     position: 'absolute',
@@ -272,68 +452,129 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.3)',
   },
   topControls: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    padding: 20,
-    gap: 12,
-  },
-  bottomControls: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
     padding: 20,
+    paddingTop: 50, // Account for status bar
+  },
+  backButton: {
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 20,
+    padding: 8,
+  },
+  rightControls: {
+    flexDirection: 'row',
+    gap: 12,
   },
   controlButton: {
     backgroundColor: 'rgba(0,0,0,0.5)',
     borderRadius: 20,
     padding: 8,
   },
-  captureButton: {
+  activeControlButton: {
     backgroundColor: theme.colors.primary,
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  zoomButton: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  previewContainer: {
-    flex: 1,
-    position: 'relative',
-  },
-  preview: {
-    flex: 1,
-  },
-  previewActions: {
+  zoomIndicator: {
     position: 'absolute',
-    bottom: 0,
+    top: 100,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  zoomText: {
+    color: theme.colors.white,
+    fontWeight: 'bold',
+  },
+  bottomControls: {
+    position: 'absolute',
+    bottom: 40,
     left: 0,
     right: 0,
     flexDirection: 'row',
     justifyContent: 'space-around',
-    padding: 20,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    paddingHorizontal: 20,
   },
-  actionButton: {
+  captureButton: {
     backgroundColor: theme.colors.primary,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 4,
+    borderColor: 'rgba(255,255,255,0.5)',
+  },
+  captureButtonInner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: theme.colors.white,
+  },
+  disabledCaptureButton: {
+    opacity: 0.7,
+  },
+  zoomButton: {
+    backgroundColor: 'rgba(0,0,0,0.5)',
     width: 48,
     height: 48,
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
   },
-}); 
+  previewContainer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: theme.colors.background,
+  },
+  preview: {
+    flex: 1,
+  },
+  previewOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    padding: 20,
+    paddingBottom: 40,
+  },
+  previewTitle: {
+    ...theme.typography.h3,
+    color: theme.colors.white,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  previewActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  actionButton: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  analyzeButton: {
+    backgroundColor: theme.colors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  disabledAnalyzeButton: {
+    opacity: 0.7,
+  },
+  actionText: {
+    ...theme.typography.button,
+    color: theme.colors.white,
+  },
+});
