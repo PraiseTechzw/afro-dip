@@ -60,19 +60,19 @@ interface Styles {
 }
 
 export default function OnboardingScreen() {
-  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const router = useRouter();
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
 
   const handleNext = () => {
     if (currentSlideIndex < slides.length - 1) {
       setCurrentSlideIndex(currentSlideIndex + 1);
     } else {
-      router.replace('/home');
+      router.push('/home');
     }
   };
 
   const handleSkip = () => {
-    router.replace('/home');
+    router.push('/home');
   };
 
   return (
