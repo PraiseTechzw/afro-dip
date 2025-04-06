@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,18 +8,58 @@ import {
   Image,
   TextInput,
   Animated,
+  ActivityIndicator,
+  RefreshControl,
+  Dimensions,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { theme } from '../../constants/theme';
 import { flySpecies } from '../../constants/speciesData';
+import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+
+const { width } = Dimensions.get('window');
+
+type SortOption = 'name' | 'family' | 'region';
+type ViewMode = 'grid' | 'list';
 
 export default function LibraryScreen() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFamily, setSelectedFamily] = useState<string | null>(null);
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<'name' | 'family'>('name');
+  const [sortBy, setSortBy] = useState<SortOption>('name');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(false);
+  
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.95)).current;
+  const searchBarAnim = useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 8,
+        tension: 40,
+        useNativeDriver: true,
+      }),
+      Animated.spring(searchBarAnim, {
+        toValue: 1,
+        friction: 8,
+        tension: 40,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   // Get unique families and regions
   const families = useMemo(() => {
@@ -40,7 +80,9 @@ export default function LibraryScreen() {
       result = result.filter(
         s =>
           s.scientificName.toLowerCase().includes(query) ||
-          s.commonName.toLowerCase().includes(query)
+          s.commonName.toLowerCase().includes(query) ||
+          s.family.toLowerCase().includes(query) ||
+          s.distribution.toLowerCase().includes(query)
       );
     }
 
@@ -56,15 +98,47 @@ export default function LibraryScreen() {
 
     // Sort results
     result.sort((a, b) => {
-      if (sortBy === 'name') {
-        return a.scientificName.localeCompare(b.scientificName);
-      } else {
-        return a.family.localeCompare(b.family);
+      switch (sortBy) {
+        case 'name':
+          return a.scientificName.localeCompare(b.scientificName);
+        case 'family':
+          return a.family.localeCompare(b.family);
+        case 'region':
+          return a.distribution.localeCompare(b.distribution);
+        default:
+          return 0;
       }
     });
 
     return result;
   }, [searchQuery, selectedFamily, selectedRegion, sortBy]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Simulate refresh
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setRefreshing(false);
+  };
+
+  const handleViewModeChange = (mode: ViewMode) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setViewMode(mode);
+  };
+
+  const handleSortChange = (option: SortOption) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSortBy(option);
+  };
+
+  const handleFilterChange = (type: 'family' | 'region', value: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (type === 'family') {
+      setSelectedFamily(selectedFamily === value ? null : value);
+    } else {
+      setSelectedRegion(selectedRegion === value ? null : value);
+    }
+  };
 
   const renderFilterChip = (
     label: string,
@@ -74,6 +148,7 @@ export default function LibraryScreen() {
     <TouchableOpacity
       style={[styles.filterChip, isSelected && styles.filterChipSelected]}
       onPress={onPress}
+      activeOpacity={0.7}
     >
       <Text
         style={[
@@ -86,31 +161,128 @@ export default function LibraryScreen() {
     </TouchableOpacity>
   );
 
-  const renderItem = ({ item }: { item: typeof flySpecies[0] }) => (
-    <TouchableOpacity
-      style={styles.speciesCard}
-      onPress={() => router.push(`/species/${item.id}`)}
+  const renderItem = ({ item, index }: { item: typeof flySpecies[0]; index: number }) => (
+    <Animated.View
+      style={[
+        styles.speciesCard,
+        viewMode === 'grid' ? styles.gridCard : styles.listCard,
+        {
+          opacity: fadeAnim,
+          transform: [
+            { scale: scaleAnim },
+            {
+              translateY: fadeAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [50, 0],
+              }),
+            },
+          ],
+        },
+      ]}
     >
-      <Image
-        source={{ uri: item.imageUrl }}
-        style={styles.speciesImage}
-        defaultSource={require('../../assets/images/image.png')}
-      />
-      <View style={styles.speciesInfo}>
-        <Text style={styles.scientificName}>{item.scientificName}</Text>
-        <Text style={styles.commonName}>{item.commonName}</Text>
-        <View style={styles.taxonomyBadge}>
-          <MaterialCommunityIcons name="family-tree" size={16} color={theme.colors.primary} />
-          <Text style={styles.taxonomyText}>{item.family}</Text>
+      <TouchableOpacity
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          router.push(`/species/${item.id}`);
+        }}
+        activeOpacity={0.7}
+      >
+        <Image
+          source={{ uri: item.imageUrl }}
+          style={[
+            styles.speciesImage,
+            viewMode === 'grid' ? styles.gridImage : styles.listImage,
+          ]}
+          defaultSource={require('../../assets/images/image.png')}
+        />
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.7)']}
+          style={styles.imageOverlay}
+        />
+        <View style={styles.speciesInfo}>
+          <Text style={styles.scientificName}>{item.scientificName}</Text>
+          <Text style={styles.commonName}>{item.commonName}</Text>
+          <View style={styles.taxonomyBadge}>
+            <MaterialCommunityIcons name="family-tree" size={16} color={theme.colors.primary} />
+            <Text style={styles.taxonomyText}>{item.family}</Text>
+          </View>
+          <View style={styles.regionBadge}>
+            <MaterialCommunityIcons name="map-marker" size={16} color={theme.colors.primary} />
+            <Text style={styles.regionText}>{item.distribution}</Text>
+          </View>
         </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </Animated.View>
   );
 
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={styles.loadingText}>Loading species library...</Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.container}>
+    <Animated.View 
+      style={[
+        styles.container,
+        { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }
+      ]}
+    >
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>Species Library</Text>
+        <View style={styles.viewModeToggle}>
+          <TouchableOpacity
+            style={[
+              styles.viewModeButton,
+              viewMode === 'grid' && styles.viewModeButtonActive,
+            ]}
+            onPress={() => handleViewModeChange('grid')}
+            activeOpacity={0.7}
+          >
+            <MaterialCommunityIcons
+              name="grid"
+              size={24}
+              color={viewMode === 'grid' ? theme.colors.white : theme.colors.textLight}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.viewModeButton,
+              viewMode === 'list' && styles.viewModeButtonActive,
+            ]}
+            onPress={() => handleViewModeChange('list')}
+            activeOpacity={0.7}
+          >
+            <MaterialCommunityIcons
+              name="format-list-bulleted"
+              size={24}
+              color={viewMode === 'list' ? theme.colors.white : theme.colors.textLight}
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
+
       {/* Search Bar */}
-      <View style={styles.searchContainer}>
+      <Animated.View 
+        style={[
+          styles.searchContainer,
+          {
+            transform: [
+              { scale: searchBarAnim },
+              {
+                translateY: searchBarAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-20, 0],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
         <MaterialCommunityIcons name="magnify" size={24} color={theme.colors.textLight} />
         <TextInput
           style={styles.searchInput}
@@ -124,14 +296,15 @@ export default function LibraryScreen() {
             <MaterialCommunityIcons name="close" size={24} color={theme.colors.textLight} />
           </TouchableOpacity>
         ) : null}
-      </View>
+      </Animated.View>
 
       {/* Sort Options */}
       <View style={styles.sortContainer}>
         <Text style={styles.sortLabel}>Sort by:</Text>
         <TouchableOpacity
           style={[styles.sortButton, sortBy === 'name' && styles.sortButtonActive]}
-          onPress={() => setSortBy('name')}
+          onPress={() => handleSortChange('name')}
+          activeOpacity={0.7}
         >
           <Text
             style={[
@@ -144,7 +317,8 @@ export default function LibraryScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.sortButton, sortBy === 'family' && styles.sortButtonActive]}
-          onPress={() => setSortBy('family')}
+          onPress={() => handleSortChange('family')}
+          activeOpacity={0.7}
         >
           <Text
             style={[
@@ -153,6 +327,20 @@ export default function LibraryScreen() {
             ]}
           >
             Family
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.sortButton, sortBy === 'region' && styles.sortButtonActive]}
+          onPress={() => handleSortChange('region')}
+          activeOpacity={0.7}
+        >
+          <Text
+            style={[
+              styles.sortButtonText,
+              sortBy === 'region' && styles.sortButtonTextActive,
+            ]}
+          >
+            Region
           </Text>
         </TouchableOpacity>
       </View>
@@ -166,7 +354,7 @@ export default function LibraryScreen() {
               {renderFilterChip(
                 family,
                 selectedFamily === family,
-                () => setSelectedFamily(selectedFamily === family ? null : family)
+                () => handleFilterChange('family', family)
               )}
             </React.Fragment>
           ))}
@@ -182,22 +370,35 @@ export default function LibraryScreen() {
               {renderFilterChip(
                 region,
                 selectedRegion === region,
-                () => setSelectedRegion(selectedRegion === region ? null : region)
+                () => handleFilterChange('region', region)
               )}
             </React.Fragment>
           ))}
         </View>
       </View>
 
-      {/* Species List */}
+      {/* Species List/Grid */}
       <FlatList
+        key={viewMode}
         data={filteredSpecies}
         renderItem={renderItem}
         keyExtractor={item => item.id}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          viewMode === 'grid' && styles.gridContent,
+        ]}
+        numColumns={viewMode === 'grid' ? 2 : 1}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[theme.colors.primary]}
+            tintColor={theme.colors.primary}
+          />
+        }
       />
-    </View>
+    </Animated.View>
   );
 }
 
@@ -205,6 +406,52 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: theme.colors.background,
+  },
+  loadingText: {
+    ...theme.typography.body,
+    color: theme.colors.textLight,
+    marginTop: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    paddingTop: 8,
+  },
+  title: {
+    ...theme.typography.h1,
+    color: theme.colors.primary,
+    fontSize: 28,
+  },
+  viewModeToggle: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  viewModeButton: {
+    backgroundColor: theme.colors.white,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: theme.colors.gray,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  viewModeButtonActive: {
+    backgroundColor: theme.colors.primary,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -244,6 +491,15 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 16,
     marginRight: 8,
+    backgroundColor: theme.colors.white,
+    shadowColor: theme.colors.gray,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   sortButtonActive: {
     backgroundColor: theme.colors.primary,
@@ -276,6 +532,14 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: theme.colors.gray,
+    shadowColor: theme.colors.gray,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   filterChipSelected: {
     backgroundColor: theme.colors.primary,
@@ -291,47 +555,84 @@ const styles = StyleSheet.create({
   listContent: {
     padding: 16,
   },
+  gridContent: {
+    gap: 16,
+  },
   speciesCard: {
     backgroundColor: theme.colors.white,
-    borderRadius: 12,
-    marginBottom: 16,
+    borderRadius: 16,
     overflow: 'hidden',
     shadowColor: theme.colors.gray,
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  gridCard: {
+    flex: 1,
+    marginHorizontal: 8,
+  },
+  listCard: {
+    marginBottom: 16,
   },
   speciesImage: {
     width: '100%',
+  },
+  gridImage: {
+    height: 150,
+  },
+  listImage: {
     height: 200,
+  },
+  imageOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 100,
   },
   speciesInfo: {
     padding: 16,
   },
   scientificName: {
-    ...theme.typography.h2,
+    ...theme.typography.h3,
     color: theme.colors.text,
     marginBottom: 4,
+    fontStyle: 'italic',
   },
   commonName: {
     ...theme.typography.body,
     color: theme.colors.textLight,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   taxonomyBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.primaryLight,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    backgroundColor: theme.colors.primary + '10',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
     alignSelf: 'flex-start',
+    marginBottom: 8,
   },
   taxonomyText: {
+    ...theme.typography.caption,
+    color: theme.colors.primary,
+    marginLeft: 4,
+  },
+  regionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.primary + '10',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  regionText: {
     ...theme.typography.caption,
     color: theme.colors.primary,
     marginLeft: 4,

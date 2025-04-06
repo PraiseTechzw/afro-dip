@@ -363,7 +363,7 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 20,
-    paddingTop: StatusBar.currentHeight + 10,
+    paddingTop: (StatusBar.currentHeight ?? 0) + 10,
     paddingBottom: 30,
   },
   title: {

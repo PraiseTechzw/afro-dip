@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,13 @@ import {
   TouchableOpacity,
   Image,
   Animated,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { theme } from '../../constants/theme';
+import * as Haptics from 'expo-haptics';
 
 // Mock data for the collection
 const mockCollection = [
@@ -40,6 +43,28 @@ export default function CollectionScreen() {
   const [sortBy, setSortBy] = useState<SortOption>('date');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(false);
+  
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.95)).current;
+
+  React.useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 8,
+        tension: 40,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   // Get unique locations for filtering
   const locations = useMemo(() => {
@@ -72,6 +97,29 @@ export default function CollectionScreen() {
     return result;
   }, [sortBy, selectedFilter]);
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Simulate refresh
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setRefreshing(false);
+  };
+
+  const handleViewModeChange = (mode: ViewMode) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setViewMode(mode);
+  };
+
+  const handleSortChange = (option: SortOption) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSortBy(option);
+  };
+
+  const handleFilterChange = (location: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedFilter(selectedFilter === location ? null : location);
+  };
+
   const renderFilterChip = (
     label: string,
     isSelected: boolean,
@@ -80,6 +128,7 @@ export default function CollectionScreen() {
     <TouchableOpacity
       style={[styles.filterChip, isSelected && styles.filterChipSelected]}
       onPress={onPress}
+      activeOpacity={0.7}
     >
       <Text
         style={[
@@ -92,49 +141,82 @@ export default function CollectionScreen() {
     </TouchableOpacity>
   );
 
-  const renderItem = ({ item }: { item: typeof mockCollection[0] }) => (
-    <TouchableOpacity
+  const renderItem = ({ item, index }: { item: typeof mockCollection[0]; index: number }) => (
+    <Animated.View
       style={[
         styles.speciesCard,
         viewMode === 'grid' ? styles.gridCard : styles.listCard,
+        {
+          opacity: fadeAnim,
+          transform: [
+            { scale: scaleAnim },
+            {
+              translateY: fadeAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [50, 0],
+              }),
+            },
+          ],
+        },
       ]}
-      onPress={() => router.push(`/species/${item.id}`)}
     >
-      <Image
-        source={{ uri: item.imageUrl }}
-        style={[
-          styles.speciesImage,
-          viewMode === 'grid' ? styles.gridImage : styles.listImage,
-        ]}
-        defaultSource={require('../../assets/images/image.png')}
-      />
-      <View style={styles.speciesInfo}>
-        <Text style={styles.scientificName}>{item.scientificName}</Text>
-        <Text style={styles.commonName}>{item.commonName}</Text>
-        <View style={styles.detailsContainer}>
-          <View style={styles.detailItem}>
-            <MaterialCommunityIcons
-              name="calendar"
-              size={16}
-              color={theme.colors.textLight}
-            />
-            <Text style={styles.detailText}>{item.date}</Text>
-          </View>
-          <View style={styles.detailItem}>
-            <MaterialCommunityIcons
-              name="map-marker"
-              size={16}
-              color={theme.colors.textLight}
-            />
-            <Text style={styles.detailText}>{item.location}</Text>
+      <TouchableOpacity
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          router.push(`/species/${item.id}`);
+        }}
+        activeOpacity={0.7}
+      >
+        <Image
+          source={{ uri: item.imageUrl }}
+          style={[
+            styles.speciesImage,
+            viewMode === 'grid' ? styles.gridImage : styles.listImage,
+          ]}
+          defaultSource={require('../../assets/images/image.png')}
+        />
+        <View style={styles.speciesInfo}>
+          <Text style={styles.scientificName}>{item.scientificName}</Text>
+          <Text style={styles.commonName}>{item.commonName}</Text>
+          <View style={styles.detailsContainer}>
+            <View style={styles.detailItem}>
+              <MaterialCommunityIcons
+                name="calendar"
+                size={16}
+                color={theme.colors.textLight}
+              />
+              <Text style={styles.detailText}>{item.date}</Text>
+            </View>
+            <View style={styles.detailItem}>
+              <MaterialCommunityIcons
+                name="map-marker"
+                size={16}
+                color={theme.colors.textLight}
+              />
+              <Text style={styles.detailText}>{item.location}</Text>
+            </View>
           </View>
         </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </Animated.View>
   );
 
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={styles.loadingText}>Loading your collection...</Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.container}>
+    <Animated.View 
+      style={[
+        styles.container,
+        { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }
+      ]}
+    >
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>My Collection</Text>
@@ -144,7 +226,8 @@ export default function CollectionScreen() {
               styles.viewModeButton,
               viewMode === 'grid' && styles.viewModeButtonActive,
             ]}
-            onPress={() => setViewMode('grid')}
+            onPress={() => handleViewModeChange('grid')}
+            activeOpacity={0.7}
           >
             <MaterialCommunityIcons
               name="grid"
@@ -157,7 +240,8 @@ export default function CollectionScreen() {
               styles.viewModeButton,
               viewMode === 'list' && styles.viewModeButtonActive,
             ]}
-            onPress={() => setViewMode('list')}
+            onPress={() => handleViewModeChange('list')}
+            activeOpacity={0.7}
           >
             <MaterialCommunityIcons
               name="format-list-bulleted"
@@ -173,7 +257,8 @@ export default function CollectionScreen() {
         <Text style={styles.sortLabel}>Sort by:</Text>
         <TouchableOpacity
           style={[styles.sortButton, sortBy === 'date' && styles.sortButtonActive]}
-          onPress={() => setSortBy('date')}
+          onPress={() => handleSortChange('date')}
+          activeOpacity={0.7}
         >
           <Text
             style={[
@@ -186,7 +271,8 @@ export default function CollectionScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.sortButton, sortBy === 'name' && styles.sortButtonActive]}
-          onPress={() => setSortBy('name')}
+          onPress={() => handleSortChange('name')}
+          activeOpacity={0.7}
         >
           <Text
             style={[
@@ -199,7 +285,8 @@ export default function CollectionScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.sortButton, sortBy === 'location' && styles.sortButtonActive]}
-          onPress={() => setSortBy('location')}
+          onPress={() => handleSortChange('location')}
+          activeOpacity={0.7}
         >
           <Text
             style={[
@@ -221,7 +308,7 @@ export default function CollectionScreen() {
               {renderFilterChip(
                 location,
                 selectedFilter === location,
-                () => setSelectedFilter(selectedFilter === location ? null : location)
+                () => handleFilterChange(location)
               )}
             </React.Fragment>
           ))}
@@ -230,6 +317,7 @@ export default function CollectionScreen() {
 
       {/* Collection List/Grid */}
       <FlatList
+        key={viewMode}
         data={sortedCollection}
         renderItem={renderItem}
         keyExtractor={item => item.id}
@@ -239,8 +327,16 @@ export default function CollectionScreen() {
         ]}
         numColumns={viewMode === 'grid' ? 2 : 1}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[theme.colors.primary]}
+            tintColor={theme.colors.primary}
+          />
+        }
       />
-    </View>
+    </Animated.View>
   );
 }
 
@@ -249,15 +345,28 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: theme.colors.background,
+  },
+  loadingText: {
+    ...theme.typography.body,
+    color: theme.colors.textLight,
+    marginTop: 16,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
+    paddingTop: 8,
   },
   title: {
     ...theme.typography.h1,
     color: theme.colors.primary,
+    fontSize: 28,
   },
   viewModeToggle: {
     flexDirection: 'row',
@@ -270,6 +379,14 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: theme.colors.gray,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   viewModeButtonActive: {
     backgroundColor: theme.colors.primary,
@@ -290,6 +407,15 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 16,
     marginRight: 8,
+    backgroundColor: theme.colors.white,
+    shadowColor: theme.colors.gray,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   sortButtonActive: {
     backgroundColor: theme.colors.primary,
@@ -322,6 +448,14 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: theme.colors.gray,
+    shadowColor: theme.colors.gray,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   filterChipSelected: {
     backgroundColor: theme.colors.primary,
@@ -342,16 +476,16 @@ const styles = StyleSheet.create({
   },
   speciesCard: {
     backgroundColor: theme.colors.white,
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: 'hidden',
     shadowColor: theme.colors.gray,
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   gridCard: {
     flex: 1,
@@ -370,17 +504,18 @@ const styles = StyleSheet.create({
     height: 200,
   },
   speciesInfo: {
-    padding: 12,
+    padding: 16,
   },
   scientificName: {
     ...theme.typography.h3,
     color: theme.colors.text,
     marginBottom: 4,
+    fontStyle: 'italic',
   },
   commonName: {
     ...theme.typography.body,
     color: theme.colors.textLight,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   detailsContainer: {
     gap: 8,
