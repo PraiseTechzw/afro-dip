@@ -33,6 +33,12 @@ export default function Layout() {
           title: 'Afro-Dip',
         }}
       />
+      <Stack.Screen
+        name="identify"
+        options={{
+          title: 'Identify Fly',
+        }}
+      />
     </Stack>
   );
 }
