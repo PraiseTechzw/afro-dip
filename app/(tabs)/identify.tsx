@@ -103,10 +103,12 @@ export default function IdentifyScreen() {
           exif: true,
         });
         
-        if (photo?.uri) {
-          setCapturedImage(photo.uri);
-          animatePreviewIn();
+        if (!photo?.uri) {
+          throw new Error('Failed to capture image');
         }
+        
+        setCapturedImage(photo.uri);
+        animatePreviewIn();
       } catch (error) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         Alert.alert('Error', 'Failed to capture image');
@@ -159,7 +161,7 @@ export default function IdentifyScreen() {
     }
   };
 
-  if (permission === null) {
+  if (!permission) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
@@ -168,7 +170,7 @@ export default function IdentifyScreen() {
     );
   }
 
-  if (permission === false) {
+  if (permission.status !== 'granted') {
     return (
       <View style={styles.permissionContainer}>
         <MaterialCommunityIcons 
