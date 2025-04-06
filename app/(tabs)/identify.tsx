@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,33 +11,24 @@ import {
   StatusBar,
   useWindowDimensions,
 } from 'react-native';
-import { Camera } from 'expo-camera/build/Camera';
+import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { theme } from '../../constants/theme';
 import * as Haptics from 'expo-haptics';
 
-const CameraConstants = {
-  Type: {
-    back: 'back',
-    front: 'front'
-  },
-  FlashMode: {
-    off: 'off',
-    on: 'on'
-  }
-};
+type FlashMode = 'on' | 'off';
 
 export default function IdentifyScreen() {
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [type, setType] = useState(CameraConstants.Type.back);
+  const [permission, requestPermission] = useCameraPermissions();
+  const [type, setType] = useState<CameraType>('back');
   const [isLoading, setIsLoading] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
-  const cameraRef = useRef<any>(null);
-  const [flashMode, setFlashMode] = useState(CameraConstants.FlashMode.off);
+  const cameraRef = useRef<CameraView>(null);
+  const [flashMode, setFlashMode] = useState<FlashMode>('off');
   const [zoom, setZoom] = useState(0);
   const [focusAnim] = useState(new Animated.Value(0));
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -46,12 +37,15 @@ export default function IdentifyScreen() {
   const shutterAnimation = useRef(new Animated.Value(1)).current;
   const previewSlideIn = useRef(new Animated.Value(screenWidth)).current;
 
-  useEffect(() => {
-    (async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(status === 'granted');
-    })();
-  }, []);
+  const toggleCameraType = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setType((current: CameraType) => (current === 'back' ? 'front' : 'back'));
+  };
+
+  const toggleFlash = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setFlashMode((current: FlashMode) => (current === 'off' ? 'on' : 'off'));
+  };
 
   const animateShutter = () => {
     Animated.sequence([
@@ -115,6 +109,10 @@ export default function IdentifyScreen() {
           base64: true,
           exif: true,
         });
+        
+        if (!photo) {
+          throw new Error('Failed to capture photo');
+        }
         
         setCapturedImage(photo.uri);
         animatePreviewIn();
@@ -180,24 +178,6 @@ export default function IdentifyScreen() {
     }
   };
 
-  const toggleFlash = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setFlashMode(
-      flashMode === CameraConstants.FlashMode.off 
-        ? CameraConstants.FlashMode.on 
-        : CameraConstants.FlashMode.off
-    );
-  };
-
-  const toggleCameraType = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setType(
-      type === CameraConstants.Type.back 
-        ? CameraConstants.Type.front 
-        : CameraConstants.Type.back
-    );
-  };
-
   const handleZoom = (value: number) => {
     const newZoom = Math.min(Math.max(0, zoom + value), 1);
     if (newZoom !== zoom) {
@@ -206,7 +186,7 @@ export default function IdentifyScreen() {
     }
   };
 
-  if (hasPermission === null) {
+  if (!permission) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
@@ -215,7 +195,7 @@ export default function IdentifyScreen() {
     );
   }
 
-  if (hasPermission === false) {
+  if (!permission.granted) {
     return (
       <View style={styles.permissionContainer}>
         <MaterialCommunityIcons 
@@ -229,9 +209,9 @@ export default function IdentifyScreen() {
         </Text>
         <TouchableOpacity 
           style={styles.permissionButton}
-          onPress={() => router.back()}
+          onPress={requestPermission}
         >
-          <Text style={styles.permissionButtonText}>Go Back</Text>
+          <Text style={styles.permissionButtonText}>Grant Permission</Text>
         </TouchableOpacity>
       </View>
     );
@@ -242,12 +222,10 @@ export default function IdentifyScreen() {
       <StatusBar barStyle="light-content" />
       
       {/* Camera View */}
-      <Camera
+      <CameraView
         ref={cameraRef}
         style={styles.camera}
-        type={type}
-        flashMode={flashMode}
-        zoom={zoom}
+        facing={type}
       >
         {/* Focus animation overlay */}
         <Animated.View
@@ -294,12 +272,12 @@ export default function IdentifyScreen() {
               <TouchableOpacity
                 style={[
                   styles.controlButton,
-                  flashMode === CameraConstants.FlashMode.off && styles.activeControlButton
+                  flashMode === 'off' && styles.activeControlButton
                 ]}
                 onPress={toggleFlash}
               >
                 <MaterialCommunityIcons
-                  name={flashMode === CameraConstants.FlashMode.off ? 'flash-off' : 'flash'}
+                  name={flashMode === 'off' ? 'flash-off' : 'flash'}
                   size={24}
                   color={theme.colors.white}
                 />
@@ -365,7 +343,7 @@ export default function IdentifyScreen() {
             </TouchableOpacity>
           </View>
         </View>
-      </Camera>
+      </CameraView>
       
       {/* Image Preview */}
       {capturedImage && (
