@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ViewStyle, TextStyle } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ViewStyle, TextStyle, Animated } from 'react-native';
 import { theme } from '../constants/theme';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -13,6 +13,8 @@ interface Slide {
   title: string;
   description: string;
   icon: IconName;
+  iconColor: string;
+  backgroundColor: string;
 }
 
 const slides: Slide[] = [
@@ -21,24 +23,32 @@ const slides: Slide[] = [
     title: 'Welcome to Afro-Dip',
     description: 'Your comprehensive guide to identifying flies in Zimbabwe',
     icon: 'bug',
+    iconColor: '#4CAF50',
+    backgroundColor: '#E8F5E9',
   },
   {
     id: '2',
     title: 'Identify Flies',
     description: 'Take photos or upload images to identify different fly species',
     icon: 'camera',
+    iconColor: '#2196F3',
+    backgroundColor: '#E3F2FD',
   },
   {
     id: '3',
     title: 'Explore Species',
     description: 'Browse through our extensive database of fly species',
     icon: 'book-open-variant',
+    iconColor: '#9C27B0',
+    backgroundColor: '#F3E5F5',
   },
   {
     id: '4',
     title: 'Learn Taxonomy',
     description: 'Understand fly classification and characteristics',
     icon: 'school',
+    iconColor: '#FF9800',
+    backgroundColor: '#FFF3E0',
   },
 ];
 
@@ -62,13 +72,42 @@ interface Styles {
 export default function OnboardingScreen() {
   const router = useRouter();
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const fadeAnim = new Animated.Value(1);
+  const scaleAnim = new Animated.Value(1);
 
   const handleNext = () => {
-    if (currentSlideIndex < slides.length - 1) {
-      setCurrentSlideIndex(currentSlideIndex + 1);
-    } else {
-      router.push('/home');
-    }
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 0.8,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      if (currentSlideIndex < slides.length - 1) {
+        setCurrentSlideIndex(currentSlideIndex + 1);
+        fadeAnim.setValue(0);
+        scaleAnim.setValue(0.8);
+        Animated.parallel([
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(scaleAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      } else {
+        router.push('/home');
+      }
+    });
   };
 
   const handleSkip = () => {
@@ -77,17 +116,25 @@ export default function OnboardingScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.slideContainer}>
-        <View style={styles.iconContainer}>
+      <Animated.View
+        style={[
+          styles.slideContainer,
+          {
+            opacity: fadeAnim,
+            transform: [{ scale: scaleAnim }],
+          },
+        ]}
+      >
+        <View style={[styles.iconContainer, { backgroundColor: slides[currentSlideIndex].backgroundColor }]}>
           <MaterialCommunityIcons
             name={slides[currentSlideIndex].icon}
             size={120}
-            color={theme.colors.primary}
+            color={slides[currentSlideIndex].iconColor}
           />
         </View>
         <Text style={styles.title}>{slides[currentSlideIndex].title}</Text>
         <Text style={styles.description}>{slides[currentSlideIndex].description}</Text>
-      </View>
+      </Animated.View>
 
       <View style={styles.footer}>
         <View style={styles.pagination}>
@@ -131,13 +178,20 @@ const styles = StyleSheet.create<Styles>({
     padding: theme.spacing.xl,
   },
   iconContainer: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: theme.colors.primaryLight,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: theme.spacing.xl,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
   title: {
     ...theme.typography.h1,
@@ -188,6 +242,14 @@ const styles = StyleSheet.create<Styles>({
     borderRadius: theme.borderRadius.lg,
     minWidth: 120,
     alignItems: 'center',
+    shadowColor: theme.colors.primary,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   nextButtonText: {
     ...theme.typography.button,
