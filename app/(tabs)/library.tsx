@@ -1,5 +1,14 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  Image,
+  TextInput,
+  Animated,
+} from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { theme } from '../../constants/theme';
@@ -9,77 +18,184 @@ export default function LibraryScreen() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFamily, setSelectedFamily] = useState<string | null>(null);
+  const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<'name' | 'family'>('name');
 
-  const families = Array.from(new Set(flySpecies.map(species => species.family)));
+  // Get unique families and regions
+  const families = useMemo(() => {
+    return Array.from(new Set(flySpecies.map(s => s.family)));
+  }, []);
 
-  const filteredSpecies = flySpecies.filter(species => {
-    const matchesSearch = species.commonName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         species.scientificName.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFamily = !selectedFamily || species.family === selectedFamily;
-    return matchesSearch && matchesFamily;
-  });
+  const regions = useMemo(() => {
+    return Array.from(new Set(flySpecies.map(s => s.distribution)));
+  }, []);
 
-  const renderItem = ({ item }) => (
+  // Filter and sort species
+  const filteredSpecies = useMemo(() => {
+    let result = [...flySpecies];
+
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(
+        s =>
+          s.scientificName.toLowerCase().includes(query) ||
+          s.commonName.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply family filter
+    if (selectedFamily) {
+      result = result.filter(s => s.family === selectedFamily);
+    }
+
+    // Apply region filter
+    if (selectedRegion) {
+      result = result.filter(s => s.distribution === selectedRegion);
+    }
+
+    // Sort results
+    result.sort((a, b) => {
+      if (sortBy === 'name') {
+        return a.scientificName.localeCompare(b.scientificName);
+      } else {
+        return a.family.localeCompare(b.family);
+      }
+    });
+
+    return result;
+  }, [searchQuery, selectedFamily, selectedRegion, sortBy]);
+
+  const renderFilterChip = (
+    label: string,
+    isSelected: boolean,
+    onPress: () => void
+  ) => (
+    <TouchableOpacity
+      style={[styles.filterChip, isSelected && styles.filterChipSelected]}
+      onPress={onPress}
+    >
+      <Text
+        style={[
+          styles.filterChipText,
+          isSelected && styles.filterChipTextSelected,
+        ]}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  const renderItem = ({ item }: { item: typeof flySpecies[0] }) => (
     <TouchableOpacity
       style={styles.speciesCard}
       onPress={() => router.push(`/species/${item.id}`)}
     >
+      <Image
+        source={{ uri: item.imageUrl }}
+        style={styles.speciesImage}
+        defaultSource={require('../../assets/images/image.png')}
+      />
       <View style={styles.speciesInfo}>
         <Text style={styles.scientificName}>{item.scientificName}</Text>
         <Text style={styles.commonName}>{item.commonName}</Text>
-        <Text style={styles.family}>{item.family}</Text>
+        <View style={styles.taxonomyBadge}>
+          <MaterialCommunityIcons name="family-tree" size={16} color={theme.colors.primary} />
+          <Text style={styles.taxonomyText}>{item.family}</Text>
+        </View>
       </View>
-      <MaterialCommunityIcons name="chevron-right" size={24} color={theme.colors.gray} />
     </TouchableOpacity>
   );
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Species Library</Text>
-        <Text style={styles.subtitle}>Browse our comprehensive fly database</Text>
-      </View>
-
+      {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <MaterialCommunityIcons name="magnify" size={24} color={theme.colors.gray} />
+        <MaterialCommunityIcons name="magnify" size={24} color={theme.colors.textLight} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search species..."
           value={searchQuery}
           onChangeText={setSearchQuery}
+          placeholderTextColor={theme.colors.textLight}
         />
+        {searchQuery ? (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <MaterialCommunityIcons name="close" size={24} color={theme.colors.textLight} />
+          </TouchableOpacity>
+        ) : null}
       </View>
 
-      <View style={styles.filterContainer}>
-        <Text style={styles.filterTitle}>Filter by Family:</Text>
-        <View style={styles.familyButtons}>
-          <TouchableOpacity
-            style={[styles.familyButton, !selectedFamily && styles.selectedFamilyButton]}
-            onPress={() => setSelectedFamily(null)}
+      {/* Sort Options */}
+      <View style={styles.sortContainer}>
+        <Text style={styles.sortLabel}>Sort by:</Text>
+        <TouchableOpacity
+          style={[styles.sortButton, sortBy === 'name' && styles.sortButtonActive]}
+          onPress={() => setSortBy('name')}
+        >
+          <Text
+            style={[
+              styles.sortButtonText,
+              sortBy === 'name' && styles.sortButtonTextActive,
+            ]}
           >
-            <Text style={[styles.familyButtonText, !selectedFamily && styles.selectedFamilyButtonText]}>
-              All
-            </Text>
-          </TouchableOpacity>
+            Name
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.sortButton, sortBy === 'family' && styles.sortButtonActive]}
+          onPress={() => setSortBy('family')}
+        >
+          <Text
+            style={[
+              styles.sortButtonText,
+              sortBy === 'family' && styles.sortButtonTextActive,
+            ]}
+          >
+            Family
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Family Filters */}
+      <View style={styles.filterSection}>
+        <Text style={styles.filterTitle}>Families</Text>
+        <View style={styles.filterChips}>
           {families.map(family => (
-            <TouchableOpacity
-              key={family}
-              style={[styles.familyButton, selectedFamily === family && styles.selectedFamilyButton]}
-              onPress={() => setSelectedFamily(family)}
-            >
-              <Text style={[styles.familyButtonText, selectedFamily === family && styles.selectedFamilyButtonText]}>
-                {family}
-              </Text>
-            </TouchableOpacity>
+            <React.Fragment key={family}>
+              {renderFilterChip(
+                family,
+                selectedFamily === family,
+                () => setSelectedFamily(selectedFamily === family ? null : family)
+              )}
+            </React.Fragment>
           ))}
         </View>
       </View>
 
+      {/* Region Filters */}
+      <View style={styles.filterSection}>
+        <Text style={styles.filterTitle}>Regions</Text>
+        <View style={styles.filterChips}>
+          {regions.map(region => (
+            <React.Fragment key={region}>
+              {renderFilterChip(
+                region,
+                selectedRegion === region,
+                () => setSelectedRegion(selectedRegion === region ? null : region)
+              )}
+            </React.Fragment>
+          ))}
+        </View>
+      </View>
+
+      {/* Species List */}
       <FlatList
         data={filteredSpecies}
         renderItem={renderItem}
         keyExtractor={item => item.id}
-        contentContainerStyle={styles.listContainer}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
       />
     </View>
   );
@@ -90,24 +206,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
-  header: {
-    padding: 20,
-  },
-  title: {
-    ...theme.typography.h1,
-    color: theme.colors.primary,
-    marginBottom: 8,
-  },
-  subtitle: {
-    ...theme.typography.body,
-    color: theme.colors.textLight,
-  },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.colors.white,
-    marginHorizontal: 20,
-    marginBottom: 16,
+    margin: 16,
     paddingHorizontal: 16,
     borderRadius: 12,
     shadowColor: theme.colors.gray,
@@ -123,22 +226,50 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 12,
     ...theme.typography.body,
+    color: theme.colors.text,
   },
-  filterContainer: {
-    paddingHorizontal: 20,
+  sortContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
     marginBottom: 16,
+  },
+  sortLabel: {
+    ...theme.typography.body,
+    color: theme.colors.textLight,
+    marginRight: 12,
+  },
+  sortButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginRight: 8,
+  },
+  sortButtonActive: {
+    backgroundColor: theme.colors.primary,
+  },
+  sortButtonText: {
+    ...theme.typography.body,
+    color: theme.colors.textLight,
+  },
+  sortButtonTextActive: {
+    color: theme.colors.white,
+  },
+  filterSection: {
+    marginBottom: 16,
+    paddingHorizontal: 16,
   },
   filterTitle: {
     ...theme.typography.h3,
     color: theme.colors.text,
     marginBottom: 8,
   },
-  familyButtons: {
+  filterChips: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
-  familyButton: {
+  filterChip: {
     backgroundColor: theme.colors.white,
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -146,27 +277,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.gray,
   },
-  selectedFamilyButton: {
+  filterChipSelected: {
     backgroundColor: theme.colors.primary,
     borderColor: theme.colors.primary,
   },
-  familyButtonText: {
-    ...theme.typography.body,
+  filterChipText: {
+    ...theme.typography.caption,
     color: theme.colors.text,
   },
-  selectedFamilyButtonText: {
+  filterChipTextSelected: {
     color: theme.colors.white,
   },
-  listContainer: {
-    padding: 20,
+  listContent: {
+    padding: 16,
   },
   speciesCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: theme.colors.white,
-    padding: 16,
     borderRadius: 12,
-    marginBottom: 12,
+    marginBottom: 16,
+    overflow: 'hidden',
     shadowColor: theme.colors.gray,
     shadowOffset: {
       width: 0,
@@ -176,21 +305,35 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  speciesImage: {
+    width: '100%',
+    height: 200,
+  },
   speciesInfo: {
-    flex: 1,
+    padding: 16,
   },
   scientificName: {
-    ...theme.typography.h3,
+    ...theme.typography.h2,
     color: theme.colors.text,
     marginBottom: 4,
   },
   commonName: {
     ...theme.typography.body,
     color: theme.colors.textLight,
-    marginBottom: 4,
+    marginBottom: 8,
   },
-  family: {
+  taxonomyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.primaryLight,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+  },
+  taxonomyText: {
     ...theme.typography.caption,
     color: theme.colors.primary,
+    marginLeft: 4,
   },
 }); 

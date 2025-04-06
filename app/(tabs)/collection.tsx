@@ -1,5 +1,13 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  Image,
+  Animated,
+} from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { theme } from '../../constants/theme';
@@ -11,7 +19,7 @@ const mockCollection = [
     scientificName: 'Musca domestica',
     commonName: 'House Fly',
     date: '2023-05-15',
-    location: 'Nairobi, Kenya',
+    location: 'Harare, Zimbabwe',
     imageUrl: 'https://example.com/house-fly.jpg',
   },
   {
@@ -19,29 +27,92 @@ const mockCollection = [
     scientificName: 'Glossina morsitans',
     commonName: 'Tsetse Fly',
     date: '2023-06-20',
-    location: 'Serengeti, Tanzania',
+    location: 'Victoria Falls, Zimbabwe',
     imageUrl: 'https://example.com/tsetse-fly.jpg',
   },
 ];
 
+type SortOption = 'date' | 'name' | 'location';
+type ViewMode = 'grid' | 'list';
+
 export default function CollectionScreen() {
   const router = useRouter();
+  const [sortBy, setSortBy] = useState<SortOption>('date');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
 
-  const renderItem = ({ item }) => (
+  // Get unique locations for filtering
+  const locations = useMemo(() => {
+    return Array.from(new Set(mockCollection.map(item => item.location)));
+  }, []);
+
+  // Sort and filter collection
+  const sortedCollection = useMemo(() => {
+    let result = [...mockCollection];
+
+    // Apply filter
+    if (selectedFilter) {
+      result = result.filter(item => item.location === selectedFilter);
+    }
+
+    // Sort results
+    result.sort((a, b) => {
+      switch (sortBy) {
+        case 'date':
+          return new Date(b.date).getTime() - new Date(a.date).getTime();
+        case 'name':
+          return a.scientificName.localeCompare(b.scientificName);
+        case 'location':
+          return a.location.localeCompare(b.location);
+        default:
+          return 0;
+      }
+    });
+
+    return result;
+  }, [sortBy, selectedFilter]);
+
+  const renderFilterChip = (
+    label: string,
+    isSelected: boolean,
+    onPress: () => void
+  ) => (
     <TouchableOpacity
-      style={styles.card}
+      style={[styles.filterChip, isSelected && styles.filterChipSelected]}
+      onPress={onPress}
+    >
+      <Text
+        style={[
+          styles.filterChipText,
+          isSelected && styles.filterChipTextSelected,
+        ]}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  const renderItem = ({ item }: { item: typeof mockCollection[0] }) => (
+    <TouchableOpacity
+      style={[
+        styles.speciesCard,
+        viewMode === 'grid' ? styles.gridCard : styles.listCard,
+      ]}
       onPress={() => router.push(`/species/${item.id}`)}
     >
       <Image
         source={{ uri: item.imageUrl }}
-        style={styles.image}
+        style={[
+          styles.speciesImage,
+          viewMode === 'grid' ? styles.gridImage : styles.listImage,
+        ]}
         defaultSource={require('../../assets/images/image.png')}
       />
-      <View style={styles.infoContainer}>
+      <View style={styles.speciesInfo}>
         <Text style={styles.scientificName}>{item.scientificName}</Text>
         <Text style={styles.commonName}>{item.commonName}</Text>
         <View style={styles.detailsContainer}>
-          <View style={styles.detail}>
+          <View style={styles.detailItem}>
             <MaterialCommunityIcons
               name="calendar"
               size={16}
@@ -49,7 +120,7 @@ export default function CollectionScreen() {
             />
             <Text style={styles.detailText}>{item.date}</Text>
           </View>
-          <View style={styles.detail}>
+          <View style={styles.detailItem}>
             <MaterialCommunityIcons
               name="map-marker"
               size={16}
@@ -59,42 +130,115 @@ export default function CollectionScreen() {
           </View>
         </View>
       </View>
-      <MaterialCommunityIcons
-        name="chevron-right"
-        size={24}
-        color={theme.colors.gray}
-      />
     </TouchableOpacity>
   );
 
-  if (mockCollection.length === 0) {
-    return (
-      <View style={styles.emptyContainer}>
-        <MaterialCommunityIcons
-          name="folder-open"
-          size={64}
-          color={theme.colors.gray}
-        />
-        <Text style={styles.emptyTitle}>No Species in Collection</Text>
-        <Text style={styles.emptyText}>
-          Start identifying flies to build your collection
-        </Text>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>My Collection</Text>
-        <Text style={styles.subtitle}>Your identified fly species</Text>
+        <View style={styles.viewModeToggle}>
+          <TouchableOpacity
+            style={[
+              styles.viewModeButton,
+              viewMode === 'grid' && styles.viewModeButtonActive,
+            ]}
+            onPress={() => setViewMode('grid')}
+          >
+            <MaterialCommunityIcons
+              name="grid"
+              size={24}
+              color={viewMode === 'grid' ? theme.colors.white : theme.colors.textLight}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.viewModeButton,
+              viewMode === 'list' && styles.viewModeButtonActive,
+            ]}
+            onPress={() => setViewMode('list')}
+          >
+            <MaterialCommunityIcons
+              name="format-list-bulleted"
+              size={24}
+              color={viewMode === 'list' ? theme.colors.white : theme.colors.textLight}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
+      {/* Sort Options */}
+      <View style={styles.sortContainer}>
+        <Text style={styles.sortLabel}>Sort by:</Text>
+        <TouchableOpacity
+          style={[styles.sortButton, sortBy === 'date' && styles.sortButtonActive]}
+          onPress={() => setSortBy('date')}
+        >
+          <Text
+            style={[
+              styles.sortButtonText,
+              sortBy === 'date' && styles.sortButtonTextActive,
+            ]}
+          >
+            Date
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.sortButton, sortBy === 'name' && styles.sortButtonActive]}
+          onPress={() => setSortBy('name')}
+        >
+          <Text
+            style={[
+              styles.sortButtonText,
+              sortBy === 'name' && styles.sortButtonTextActive,
+            ]}
+          >
+            Name
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.sortButton, sortBy === 'location' && styles.sortButtonActive]}
+          onPress={() => setSortBy('location')}
+        >
+          <Text
+            style={[
+              styles.sortButtonText,
+              sortBy === 'location' && styles.sortButtonTextActive,
+            ]}
+          >
+            Location
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Location Filters */}
+      <View style={styles.filterSection}>
+        <Text style={styles.filterTitle}>Locations</Text>
+        <View style={styles.filterChips}>
+          {locations.map(location => (
+            <React.Fragment key={location}>
+              {renderFilterChip(
+                location,
+                selectedFilter === location,
+                () => setSelectedFilter(selectedFilter === location ? null : location)
+              )}
+            </React.Fragment>
+          ))}
+        </View>
+      </View>
+
+      {/* Collection List/Grid */}
       <FlatList
-        data={mockCollection}
+        data={sortedCollection}
         renderItem={renderItem}
         keyExtractor={item => item.id}
-        contentContainerStyle={styles.listContainer}
+        contentContainerStyle={[
+          styles.listContent,
+          viewMode === 'grid' && styles.gridContent,
+        ]}
+        numColumns={viewMode === 'grid' ? 2 : 1}
+        showsVerticalScrollIndicator={false}
       />
     </View>
   );
@@ -106,27 +250,100 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   header: {
-    padding: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
   },
   title: {
     ...theme.typography.h1,
     color: theme.colors.primary,
-    marginBottom: 8,
   },
-  subtitle: {
+  viewModeToggle: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  viewModeButton: {
+    backgroundColor: theme.colors.white,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  viewModeButtonActive: {
+    backgroundColor: theme.colors.primary,
+  },
+  sortContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  sortLabel: {
+    ...theme.typography.body,
+    color: theme.colors.textLight,
+    marginRight: 12,
+  },
+  sortButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginRight: 8,
+  },
+  sortButtonActive: {
+    backgroundColor: theme.colors.primary,
+  },
+  sortButtonText: {
     ...theme.typography.body,
     color: theme.colors.textLight,
   },
-  listContainer: {
-    padding: 20,
+  sortButtonTextActive: {
+    color: theme.colors.white,
   },
-  card: {
+  filterSection: {
+    marginBottom: 16,
+    paddingHorizontal: 16,
+  },
+  filterTitle: {
+    ...theme.typography.h3,
+    color: theme.colors.text,
+    marginBottom: 8,
+  },
+  filterChips: {
     flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  filterChip: {
+    backgroundColor: theme.colors.white,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.gray,
+  },
+  filterChipSelected: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  filterChipText: {
+    ...theme.typography.caption,
+    color: theme.colors.text,
+  },
+  filterChipTextSelected: {
+    color: theme.colors.white,
+  },
+  listContent: {
+    padding: 16,
+  },
+  gridContent: {
+    gap: 16,
+  },
+  speciesCard: {
     backgroundColor: theme.colors.white,
     borderRadius: 12,
-    marginBottom: 16,
-    padding: 16,
+    overflow: 'hidden',
     shadowColor: theme.colors.gray,
     shadowOffset: {
       width: 0,
@@ -136,14 +353,24 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  image: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    marginRight: 16,
-  },
-  infoContainer: {
+  gridCard: {
     flex: 1,
+    marginHorizontal: 8,
+  },
+  listCard: {
+    marginBottom: 16,
+  },
+  speciesImage: {
+    width: '100%',
+  },
+  gridImage: {
+    height: 150,
+  },
+  listImage: {
+    height: 200,
+  },
+  speciesInfo: {
+    padding: 12,
   },
   scientificName: {
     ...theme.typography.h3,
@@ -156,33 +383,15 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   detailsContainer: {
-    flexDirection: 'row',
-    gap: 16,
+    gap: 8,
   },
-  detail: {
+  detailItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
   },
   detailText: {
     ...theme.typography.caption,
     color: theme.colors.textLight,
-    marginLeft: 4,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  emptyTitle: {
-    ...theme.typography.h2,
-    color: theme.colors.text,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyText: {
-    ...theme.typography.body,
-    color: theme.colors.textLight,
-    textAlign: 'center',
   },
 }); 
