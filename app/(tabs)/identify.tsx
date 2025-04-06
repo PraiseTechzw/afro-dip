@@ -11,7 +11,8 @@ import {
   StatusBar,
   useWindowDimensions,
 } from 'react-native';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { Camera } from 'expo-camera/legacy';
+import * as ImagePicker from 'expo-image-picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { theme } from '../../constants/theme';
@@ -20,12 +21,12 @@ import * as Haptics from 'expo-haptics';
 export default function IdentifyScreen() {
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
-  const [permission, requestPermission] = useCameraPermissions();
-  const [type, setType] = useState<'back' | 'front'>('back');
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [type, setType] = useState(Camera.Constants.Type.back);
   const [isLoading, setIsLoading] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
-  const cameraRef = useRef<CameraView>(null);
-  const [flashMode, setFlashMode] = useState<'off' | 'on'>('off');
+  const cameraRef = useRef<Camera>(null);
+  const [flashMode, setFlashMode] = useState(Camera.Constants.FlashMode.off);
   const [zoom, setZoom] = useState(0);
   const [focusAnim] = useState(new Animated.Value(0));
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -35,10 +36,11 @@ export default function IdentifyScreen() {
   const previewSlideIn = useRef(new Animated.Value(screenWidth)).current;
 
   useEffect(() => {
-    if (!permission?.granted) {
-      requestPermission();
-    }
-  }, [permission]);
+    (async () => {
+      const { status } = await Camera.requestCameraPermissionsAsync();
+      setHasPermission(status === 'granted');
+    })();
+  }, []);
 
   const animateShutter = () => {
     Animated.sequence([
@@ -103,10 +105,6 @@ export default function IdentifyScreen() {
           exif: true,
         });
         
-        if (!photo?.uri) {
-          throw new Error('Failed to capture image');
-        }
-        
         setCapturedImage(photo.uri);
         animatePreviewIn();
       } catch (error) {
@@ -116,6 +114,34 @@ export default function IdentifyScreen() {
       } finally {
         setIsLoading(false);
       }
+    }
+  };
+
+  const handlePickImage = async () => {
+    try {
+      // Request permissions
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert('Permission denied', 'We need access to your photos to select an image');
+        return;
+      }
+      
+      // Launch image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 1,
+      });
+      
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setCapturedImage(result.assets[0].uri);
+        animatePreviewIn();
+      }
+    } catch (error) {
+      console.error('Image picker error:', error);
+      Alert.alert('Error', 'Failed to pick image from gallery');
     }
   };
 
@@ -145,12 +171,20 @@ export default function IdentifyScreen() {
 
   const toggleFlash = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setFlashMode(flashMode === 'off' ? 'on' : 'off');
+    setFlashMode(
+      flashMode === Camera.Constants.FlashMode.off 
+        ? Camera.Constants.FlashMode.on 
+        : Camera.Constants.FlashMode.off
+    );
   };
 
   const toggleCameraType = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setType(type === 'back' ? 'front' : 'back');
+    setType(
+      type === Camera.Constants.Type.back 
+        ? Camera.Constants.Type.front 
+        : Camera.Constants.Type.back
+    );
   };
 
   const handleZoom = (value: number) => {
@@ -161,7 +195,7 @@ export default function IdentifyScreen() {
     }
   };
 
-  if (!permission) {
+  if (hasPermission === null) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
@@ -170,7 +204,7 @@ export default function IdentifyScreen() {
     );
   }
 
-  if (permission.status !== 'granted') {
+  if (hasPermission === false) {
     return (
       <View style={styles.permissionContainer}>
         <MaterialCommunityIcons 
@@ -197,13 +231,12 @@ export default function IdentifyScreen() {
       <StatusBar barStyle="light-content" />
       
       {/* Camera View */}
-      <CameraView
+      <Camera
         ref={cameraRef}
         style={styles.camera}
-        facing={type}
-        flash={flashMode}
+        type={type}
+        flashMode={flashMode}
         zoom={zoom}
-        enableTorch={flashMode === 'on'}
       >
         {/* Focus animation overlay */}
         <Animated.View
@@ -250,12 +283,12 @@ export default function IdentifyScreen() {
               <TouchableOpacity
                 style={[
                   styles.controlButton,
-                  flashMode === 'on' && styles.activeControlButton
+                  flashMode === Camera.Constants.FlashMode.off && styles.activeControlButton
                 ]}
                 onPress={toggleFlash}
               >
                 <MaterialCommunityIcons
-                  name={flashMode === 'off' ? 'flash-off' : 'flash'}
+                  name={flashMode === Camera.Constants.FlashMode.off ? 'flash-off' : 'flash'}
                   size={24}
                   color={theme.colors.white}
                 />
@@ -284,11 +317,11 @@ export default function IdentifyScreen() {
           {/* Bottom Controls */}
           <View style={styles.bottomControls}>
             <TouchableOpacity
-              style={styles.zoomButton}
-              onPress={() => handleZoom(-0.1)}
+              style={styles.galleryButton}
+              onPress={handlePickImage}
             >
               <MaterialCommunityIcons
-                name="minus"
+                name="image"
                 size={24}
                 color={theme.colors.white}
               />
@@ -314,14 +347,14 @@ export default function IdentifyScreen() {
               onPress={() => handleZoom(0.1)}
             >
               <MaterialCommunityIcons
-                name="plus"
+                name="magnify-plus"
                 size={24}
                 color={theme.colors.white}
               />
             </TouchableOpacity>
           </View>
         </View>
-      </CameraView>
+      </Camera>
       
       {/* Image Preview */}
       {capturedImage && (
@@ -524,6 +557,14 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   zoomButton: {
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  galleryButton: {
     backgroundColor: 'rgba(0,0,0,0.5)',
     width: 48,
     height: 48,
