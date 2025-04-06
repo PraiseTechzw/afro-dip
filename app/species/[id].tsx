@@ -68,11 +68,6 @@ export default function SpeciesDetailsScreen() {
     }
   };
 
-  const handleAddToCollection = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // TODO: Implement add to collection functionality
-  };
-
   const handleToggleFavorite = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsFavorite(!isFavorite);
@@ -282,35 +277,26 @@ export default function SpeciesDetailsScreen() {
       {/* Action Buttons */}
       <View style={styles.actionButtons}>
         <TouchableOpacity
-          style={styles.actionButton}
+          style={[styles.actionButton, styles.favoriteButton]}
           onPress={handleToggleFavorite}
         >
           <MaterialCommunityIcons
             name={isFavorite ? 'heart' : 'heart-outline'}
             size={24}
-            color={isFavorite ? theme.colors.error : theme.colors.text}
+            color={isFavorite ? theme.colors.error : theme.colors.white}
           />
-          <Text style={styles.actionButtonText}>Favorite</Text>
+          <Text style={styles.actionButtonText}>
+            {isFavorite ? 'Favorited' : 'Favorite'}
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.actionButton}
-          onPress={handleAddToCollection}
-        >
-          <MaterialCommunityIcons
-            name="plus-circle"
-            size={24}
-            color={theme.colors.text}
-          />
-          <Text style={styles.actionButtonText}>Add to Collection</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.actionButton}
+          style={[styles.actionButton, styles.shareButton]}
           onPress={handleShare}
         >
           <MaterialCommunityIcons
             name="share"
             size={24}
-            color={theme.colors.text}
+            color={theme.colors.white}
           />
           <Text style={styles.actionButtonText}>Share</Text>
         </TouchableOpacity>
@@ -514,7 +500,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: theme.colors.primary,
     padding: 16,
     borderRadius: 12,
     shadowColor: theme.colors.gray,
@@ -525,6 +510,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  favoriteButton: {
+    backgroundColor: theme.colors.primary,
+  },
+  shareButton: {
+    backgroundColor: theme.colors.secondary,
   },
   actionButtonText: {
     ...theme.typography.button,
