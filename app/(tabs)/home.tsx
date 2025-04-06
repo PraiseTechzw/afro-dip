@@ -12,7 +12,7 @@ const recentIdentifications = [
     scientificName: 'Musca domestica',
     commonName: 'House Fly',
     date: '2023-05-15',
-    imageUrl: 'https://example.com/house-fly.jpg',
+    imageUrl: 'https://robinneweiss.com/wp-content/uploads/2016/03/tachinid2.png',
   },
   {
     id: '2',

@@ -4,9 +4,17 @@ export interface FlySpecies {
   commonName: string;
   family: string;
   description: string;
-  habitat: string;
-  distribution: string;
   imageUrl: string;
+  characteristics: string[];
+  distribution: string;
+  habitat: string;
+  behavior: string;
+  similarSpecies?: {
+    id: string;
+    scientificName: string;
+    commonName: string;
+    imageUrl: string;
+  }[];
 }
 
 export const flySpecies: FlySpecies[] = [
@@ -19,6 +27,8 @@ export const flySpecies: FlySpecies[] = [
     habitat: 'Urban and rural areas, particularly around human habitation',
     distribution: 'Widespread throughout Zimbabwe',
     imageUrl: 'https://example.com/house-fly.jpg',
+    characteristics: [],
+    behavior: '',
   },
   {
     id: '2',
@@ -29,6 +39,8 @@ export const flySpecies: FlySpecies[] = [
     habitat: 'Woodlands and savannas',
     distribution: 'Northern and eastern regions of Zimbabwe',
     imageUrl: 'https://example.com/tsetse-fly.jpg',
+    characteristics: [],
+    behavior: '',
   },
   {
     id: '3',
@@ -39,6 +51,8 @@ export const flySpecies: FlySpecies[] = [
     habitat: 'Agricultural areas, particularly around livestock',
     distribution: 'Throughout Zimbabwe',
     imageUrl: 'https://example.com/stable-fly.jpg',
+    characteristics: [],
+    behavior: '',
   },
   {
     id: '4',
@@ -49,6 +63,8 @@ export const flySpecies: FlySpecies[] = [
     habitat: 'Wooded areas near water',
     distribution: 'Eastern and northern Zimbabwe',
     imageUrl: 'https://example.com/deer-fly.jpg',
+    characteristics: [],
+    behavior: '',
   },
   {
     id: '5',
@@ -59,6 +75,8 @@ export const flySpecies: FlySpecies[] = [
     habitat: 'Grasslands and agricultural areas',
     distribution: 'Throughout Zimbabwe',
     imageUrl: 'https://example.com/cleg-fly.jpg',
+    characteristics: [],
+    behavior: '',
   },
   {
     id: '6',
@@ -69,6 +87,8 @@ export const flySpecies: FlySpecies[] = [
     habitat: 'Urban and rural areas',
     distribution: 'Widespread throughout Zimbabwe',
     imageUrl: 'https://example.com/blue-bottle-fly.jpg',
+    characteristics: [],
+    behavior: '',
   },
   {
     id: '7',
@@ -79,6 +99,8 @@ export const flySpecies: FlySpecies[] = [
     habitat: 'Urban and rural areas',
     distribution: 'Throughout Zimbabwe',
     imageUrl: 'https://example.com/green-bottle-fly.jpg',
+    characteristics: [],
+    behavior: '',
   },
   {
     id: '8',
@@ -89,6 +111,8 @@ export const flySpecies: FlySpecies[] = [
     habitat: 'Areas with fermenting fruit',
     distribution: 'Throughout Zimbabwe',
     imageUrl: 'https://example.com/fruit-fly.jpg',
+    characteristics: [],
+    behavior: '',
   },
   {
     id: '9',
@@ -99,6 +123,8 @@ export const flySpecies: FlySpecies[] = [
     habitat: 'Moist areas and grasslands',
     distribution: 'Throughout Zimbabwe',
     imageUrl: 'https://example.com/crane-fly.jpg',
+    characteristics: [],
+    behavior: '',
   },
   {
     id: '10',
@@ -109,5 +135,7 @@ export const flySpecies: FlySpecies[] = [
     habitat: 'Areas near fast-flowing rivers',
     distribution: 'Northern and eastern Zimbabwe',
     imageUrl: 'https://example.com/black-fly.jpg',
+    characteristics: [],
+    behavior: '',
   }
 ]; 
