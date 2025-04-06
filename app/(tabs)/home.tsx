@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Animated } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { theme } from '../../constants/theme';
@@ -26,8 +26,24 @@ const recentIdentifications = [
 // Get a random featured species
 const featuredSpecies = flySpecies[Math.floor(Math.random() * flySpecies.length)];
 
+// Get fly of the day based on the current date
+const getFlyOfTheDay = () => {
+  const today = new Date().getDate();
+  return flySpecies[today % flySpecies.length];
+};
+
 export default function HomeScreen() {
   const router = useRouter();
+  const [flyOfTheDay] = useState(getFlyOfTheDay());
+  const [fadeAnim] = useState(new Animated.Value(0));
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 1000,
+      useNativeDriver: true,
+    }).start();
+  }, []);
 
   return (
     <ScrollView style={styles.container}>
@@ -36,28 +52,33 @@ export default function HomeScreen() {
         <Text style={styles.subtitle}>Your African Fly Identification Guide</Text>
       </View>
 
-      {/* Featured Species */}
-      <TouchableOpacity
-        style={styles.featuredCard}
-        onPress={() => router.push(`/species/${featuredSpecies.id}`)}
-      >
-        <Image
-          source={{ uri: featuredSpecies.imageUrl }}
-          style={styles.featuredImage}
-          defaultSource={require('../../assets/images/image.png')}
-        />
-        <View style={styles.featuredContent}>
-          <Text style={styles.featuredTitle}>Featured Species</Text>
-          <Text style={styles.featuredName}>{featuredSpecies.scientificName}</Text>
-          <Text style={styles.featuredCommonName}>{featuredSpecies.commonName}</Text>
-          <View style={styles.featuredStats}>
-            <View style={styles.stat}>
-              <MaterialCommunityIcons name="family-tree" size={20} color={theme.colors.primary} />
-              <Text style={styles.statText}>{featuredSpecies.family}</Text>
+      {/* Fly of the Day */}
+      <Animated.View style={[styles.flyOfTheDayCard, { opacity: fadeAnim }]}>
+        <View style={styles.flyOfTheDayHeader}>
+          <MaterialCommunityIcons name="star" size={24} color={theme.colors.primary} />
+          <Text style={styles.flyOfTheDayTitle}>Fly of the Day</Text>
+        </View>
+        <TouchableOpacity
+          onPress={() => router.push(`/species/${flyOfTheDay.id}`)}
+          style={styles.flyOfTheDayContent}
+        >
+          <Image
+            source={{ uri: flyOfTheDay.imageUrl }}
+            style={styles.flyOfTheDayImage}
+            defaultSource={require('../../assets/images/image.png')}
+          />
+          <View style={styles.flyOfTheDayInfo}>
+            <Text style={styles.flyOfTheDayName}>{flyOfTheDay.scientificName}</Text>
+            <Text style={styles.flyOfTheDayCommonName}>{flyOfTheDay.commonName}</Text>
+            <View style={styles.flyOfTheDayStats}>
+              <View style={styles.stat}>
+                <MaterialCommunityIcons name="family-tree" size={16} color={theme.colors.primary} />
+                <Text style={styles.statText}>{flyOfTheDay.family}</Text>
+              </View>
             </View>
           </View>
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </Animated.View>
 
       {/* Quick Stats */}
       <View style={styles.statsContainer}>
@@ -159,7 +180,7 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     color: theme.colors.textLight,
   },
-  featuredCard: {
+  flyOfTheDayCard: {
     backgroundColor: theme.colors.white,
     margin: 20,
     marginTop: 0,
@@ -174,40 +195,44 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  featuredImage: {
-    width: '100%',
-    height: 200,
+  flyOfTheDayHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: theme.colors.primaryLight,
   },
-  featuredContent: {
-    padding: 20,
-  },
-  featuredTitle: {
-    ...theme.typography.caption,
+  flyOfTheDayTitle: {
+    ...theme.typography.h3,
     color: theme.colors.primary,
-    marginBottom: 8,
+    marginLeft: 8,
   },
-  featuredName: {
+  flyOfTheDayContent: {
+    flexDirection: 'row',
+    padding: 16,
+  },
+  flyOfTheDayImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+    marginRight: 16,
+  },
+  flyOfTheDayInfo: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  flyOfTheDayName: {
     ...theme.typography.h2,
     color: theme.colors.text,
     marginBottom: 4,
   },
-  featuredCommonName: {
+  flyOfTheDayCommonName: {
     ...theme.typography.body,
     color: theme.colors.textLight,
-    marginBottom: 16,
+    marginBottom: 8,
   },
-  featuredStats: {
+  flyOfTheDayStats: {
     flexDirection: 'row',
     gap: 16,
-  },
-  stat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  statText: {
-    ...theme.typography.caption,
-    color: theme.colors.text,
   },
   statsContainer: {
     flexDirection: 'row',
@@ -305,5 +330,14 @@ const styles = StyleSheet.create({
     color: theme.colors.textLight,
     margin: 12,
     marginTop: 0,
+  },
+  stat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statText: {
+    ...theme.typography.caption,
+    color: theme.colors.text,
   },
 }); 
