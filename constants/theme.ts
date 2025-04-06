@@ -9,6 +9,8 @@ export const theme = {
     white: '#FFFFFF',
     gray: '#CCCCCC',
     black: '#000000',
+    error: '#FF5252',
+    success: '#4CAF50',
   },
   spacing: {
     xs: 4,
@@ -23,6 +25,10 @@ export const theme = {
       fontWeight: '700' as const,
     },
     h2: {
+      fontSize: 20,
+      fontWeight: '700' as const,
+    },
+    h3: {
       fontSize: 20,
       fontWeight: '700' as const,
     },
