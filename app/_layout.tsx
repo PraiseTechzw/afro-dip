@@ -39,6 +39,24 @@ export default function Layout() {
           title: 'Identify Fly',
         }}
       />
+      <Stack.Screen
+        name="library"
+        options={{
+          title: 'Species Library',
+        }}
+      />
+      <Stack.Screen
+        name="species/[id]"
+        options={{
+          title: 'Species Details',
+        }}
+      />
+      <Stack.Screen
+        name="taxonomy"
+        options={{
+          title: 'Taxonomy Guide',
+        }}
+      />
     </Stack>
   );
 }

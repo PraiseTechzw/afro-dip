@@ -24,14 +24,20 @@ export default function HomeScreen() {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.card}>
+        <TouchableOpacity 
+          style={styles.card}
+          onPress={() => router.push('/library')}
+        >
           <Text style={styles.cardTitle}>Species Library</Text>
           <Text style={styles.cardDescription}>
             Browse through our comprehensive database of fly species
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.card}>
+        <TouchableOpacity 
+          style={styles.card}
+          onPress={() => router.push('/taxonomy')}
+        >
           <Text style={styles.cardTitle}>Taxonomy Guide</Text>
           <Text style={styles.cardDescription}>
             Learn about fly classification and taxonomy
