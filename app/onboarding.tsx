@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ViewStyle, TextStyle, Animated } from 'react-native';
 import { theme } from '../constants/theme';
 import { useRouter } from 'expo-router';
@@ -6,7 +6,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 
-type IconName = 'bug' | 'camera' | 'book-open-variant' | 'school';
+type IconName = 'fly' | 'camera' | 'book-open-page-variant' | 'school';
 
 interface Slide {
   id: string;
@@ -22,85 +22,80 @@ const slides: Slide[] = [
     id: '1',
     title: 'Welcome to Afro-Dip',
     description: 'Your comprehensive guide to identifying flies in Zimbabwe',
-    icon: 'bug',
-    iconColor: '#4CAF50',
-    backgroundColor: '#E8F5E9',
+    icon: 'fly',
+    iconColor: '#00BFA5',
+    backgroundColor: '#E0F7FA',
   },
   {
     id: '2',
     title: 'Identify Flies',
     description: 'Take photos or upload images to identify different fly species',
     icon: 'camera',
-    iconColor: '#2196F3',
-    backgroundColor: '#E3F2FD',
+    iconColor: '#5C6BC0',
+    backgroundColor: '#E8EAF6',
   },
   {
     id: '3',
     title: 'Explore Species',
     description: 'Browse through our extensive database of fly species',
-    icon: 'book-open-variant',
-    iconColor: '#9C27B0',
-    backgroundColor: '#F3E5F5',
+    icon: 'book-open-page-variant',
+    iconColor: '#EC407A',
+    backgroundColor: '#FCE4EC',
   },
   {
     id: '4',
     title: 'Learn Taxonomy',
     description: 'Understand fly classification and characteristics',
     icon: 'school',
-    iconColor: '#FF9800',
-    backgroundColor: '#FFF3E0',
+    iconColor: '#FFA000',
+    backgroundColor: '#FFF8E1',
   },
 ];
-
-interface Styles {
-  container: ViewStyle;
-  slideContainer: ViewStyle;
-  iconContainer: ViewStyle;
-  title: TextStyle;
-  description: TextStyle;
-  footer: ViewStyle;
-  pagination: ViewStyle;
-  paginationDot: ViewStyle;
-  paginationDotActive: ViewStyle;
-  buttonContainer: ViewStyle;
-  skipButton: ViewStyle;
-  skipButtonText: TextStyle;
-  nextButton: ViewStyle;
-  nextButtonText: TextStyle;
-}
 
 export default function OnboardingScreen() {
   const router = useRouter();
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
-  const fadeAnim = new Animated.Value(1);
-  const scaleAnim = new Animated.Value(1);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const translateYAnim = useRef(new Animated.Value(0)).current;
 
   const handleNext = () => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 0,
-        duration: 300,
+        duration: 250,
         useNativeDriver: true,
       }),
       Animated.timing(scaleAnim, {
-        toValue: 0.8,
-        duration: 300,
+        toValue: 0.9,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateYAnim, {
+        toValue: 20,
+        duration: 250,
         useNativeDriver: true,
       }),
     ]).start(() => {
       if (currentSlideIndex < slides.length - 1) {
         setCurrentSlideIndex(currentSlideIndex + 1);
         fadeAnim.setValue(0);
-        scaleAnim.setValue(0.8);
+        scaleAnim.setValue(0.9);
+        translateYAnim.setValue(-20);
         Animated.parallel([
           Animated.timing(fadeAnim, {
             toValue: 1,
-            duration: 300,
+            duration: 250,
             useNativeDriver: true,
           }),
           Animated.timing(scaleAnim, {
             toValue: 1,
-            duration: 300,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+          Animated.timing(translateYAnim, {
+            toValue: 0,
+            duration: 250,
             useNativeDriver: true,
           }),
         ]).start();
@@ -114,6 +109,9 @@ export default function OnboardingScreen() {
     router.push('/home');
   };
 
+  const currentSlide = slides[currentSlideIndex];
+  const isLastSlide = currentSlideIndex === slides.length - 1;
+
   return (
     <View style={styles.container}>
       <Animated.View
@@ -121,19 +119,22 @@ export default function OnboardingScreen() {
           styles.slideContainer,
           {
             opacity: fadeAnim,
-            transform: [{ scale: scaleAnim }],
+            transform: [
+              { scale: scaleAnim },
+              { translateY: translateYAnim }
+            ],
           },
         ]}
       >
-        <View style={[styles.iconContainer, { backgroundColor: slides[currentSlideIndex].backgroundColor }]}>
+        <View style={[styles.iconContainer, { backgroundColor: currentSlide.backgroundColor }]}>
           <MaterialCommunityIcons
-            name={slides[currentSlideIndex].icon}
-            size={120}
-            color={slides[currentSlideIndex].iconColor}
+            name={currentSlide.icon}
+            size={100}
+            color={currentSlide.iconColor}
           />
         </View>
-        <Text style={styles.title}>{slides[currentSlideIndex].title}</Text>
-        <Text style={styles.description}>{slides[currentSlideIndex].description}</Text>
+        <Text style={styles.title}>{currentSlide.title}</Text>
+        <Text style={styles.description}>{currentSlide.description}</Text>
       </Animated.View>
 
       <View style={styles.footer}>
@@ -144,21 +145,31 @@ export default function OnboardingScreen() {
               style={[
                 styles.paginationDot,
                 currentSlideIndex === index && styles.paginationDotActive,
+                { backgroundColor: currentSlideIndex === index ? currentSlide.iconColor : '#E0E0E0' }
               ]}
             />
           ))}
         </View>
 
         <View style={styles.buttonContainer}>
-          {currentSlideIndex < slides.length - 1 && (
+          {!isLastSlide && (
             <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
               <Text style={styles.skipButtonText}>Skip</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
+          <TouchableOpacity 
+            style={[styles.nextButton, { backgroundColor: currentSlide.iconColor }]} 
+            onPress={handleNext}
+          >
             <Text style={styles.nextButtonText}>
-              {currentSlideIndex === slides.length - 1 ? 'Get Started' : 'Next'}
+              {isLastSlide ? 'Get Started' : 'Next'}
             </Text>
+            <MaterialCommunityIcons 
+              name={isLastSlide ? 'arrow-right-circle' : 'arrow-right'} 
+              size={20} 
+              color="#FFFFFF" 
+              style={styles.buttonIcon} 
+            />
           </TouchableOpacity>
         </View>
       </View>
@@ -166,63 +177,64 @@ export default function OnboardingScreen() {
   );
 }
 
-const styles = StyleSheet.create<Styles>({
+const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: '#FFFFFF',
   },
   slideContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: theme.spacing.xl,
+    padding: 24,
   },
   iconContainer: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: theme.spacing.xl,
+    marginBottom: 32,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 6,
     },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowRadius: 10,
+    elevation: 8,
   },
   title: {
-    ...theme.typography.h1,
-    color: theme.colors.primary,
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#333333',
     textAlign: 'center',
-    marginBottom: theme.spacing.md,
+    marginBottom: 16,
   },
   description: {
-    ...theme.typography.body,
-    color: theme.colors.text,
+    fontSize: 16,
+    color: '#666666',
     textAlign: 'center',
-    paddingHorizontal: theme.spacing.xl,
+    paddingHorizontal: 24,
+    lineHeight: 24,
   },
   footer: {
-    padding: theme.spacing.xl,
+    padding: 24,
   },
   pagination: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: theme.spacing.xl,
+    marginBottom: 32,
   },
   paginationDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: theme.colors.gray,
     marginHorizontal: 4,
   },
   paginationDotActive: {
-    backgroundColor: theme.colors.primary,
-    width: 20,
+    width: 24,
+    borderRadius: 4,
   },
   buttonContainer: {
     flexDirection: 'row',
@@ -230,29 +242,36 @@ const styles = StyleSheet.create<Styles>({
     alignItems: 'center',
   },
   skipButton: {
-    padding: theme.spacing.md,
+    padding: 12,
   },
   skipButtonText: {
-    ...theme.typography.body,
-    color: theme.colors.textLight,
+    fontSize: 16,
+    color: '#9E9E9E',
+    fontWeight: '500',
   },
   nextButton: {
-    backgroundColor: theme.colors.primary,
-    padding: theme.spacing.md,
-    borderRadius: theme.borderRadius.lg,
-    minWidth: 120,
+    flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: theme.colors.primary,
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    minWidth: 140,
+    shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 3,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 6,
   },
   nextButtonText: {
-    ...theme.typography.button,
-    color: theme.colors.white,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginRight: 8,
   },
-}); 
+  buttonIcon: {
+    marginLeft: 4,
+  }
+});
