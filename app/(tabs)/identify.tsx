@@ -11,7 +11,7 @@ import {
   StatusBar,
   useWindowDimensions,
 } from 'react-native';
-import { Camera } from 'expo-camera/build/Camera';
+import { Camera, CameraType, FlashMode } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -33,11 +33,11 @@ export default function IdentifyScreen() {
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [type, setType] = useState(CameraConstants.Type.back);
+  const [type, setType] = useState<CameraType>(CameraType.back);
   const [isLoading, setIsLoading] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
-  const cameraRef = useRef<any>(null);
-  const [flashMode, setFlashMode] = useState(CameraConstants.FlashMode.off);
+  const cameraRef = useRef<Camera>(null);
+  const [flashMode, setFlashMode] = useState<FlashMode>(FlashMode.off);
   const [zoom, setZoom] = useState(0);
   const [focusAnim] = useState(new Animated.Value(0));
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -183,18 +183,18 @@ export default function IdentifyScreen() {
   const toggleFlash = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setFlashMode(
-      flashMode === CameraConstants.FlashMode.off 
-        ? CameraConstants.FlashMode.on 
-        : CameraConstants.FlashMode.off
+      flashMode === FlashMode.off 
+        ? FlashMode.on 
+        : FlashMode.off
     );
   };
 
   const toggleCameraType = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setType(
-      type === CameraConstants.Type.back 
-        ? CameraConstants.Type.front 
-        : CameraConstants.Type.back
+      type === CameraType.back 
+        ? CameraType.front 
+        : CameraType.back
     );
   };
 
@@ -294,12 +294,12 @@ export default function IdentifyScreen() {
               <TouchableOpacity
                 style={[
                   styles.controlButton,
-                  flashMode === CameraConstants.FlashMode.off && styles.activeControlButton
+                  flashMode === FlashMode.off && styles.activeControlButton
                 ]}
                 onPress={toggleFlash}
               >
                 <MaterialCommunityIcons
-                  name={flashMode === CameraConstants.FlashMode.off ? 'flash-off' : 'flash'}
+                  name={flashMode === FlashMode.off ? 'flash-off' : 'flash'}
                   size={24}
                   color={theme.colors.white}
                 />
